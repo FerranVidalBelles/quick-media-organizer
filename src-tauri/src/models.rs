@@ -88,6 +88,8 @@ pub struct FrontendState {
     pub favorite_folders: Vec<String>,
     pub existing_subfolders: Vec<String>,
     pub stats: SessionStats,
+    #[serde(default)]
+    pub session_complete: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

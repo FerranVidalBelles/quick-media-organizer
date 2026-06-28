@@ -77,6 +77,7 @@
     favorite_folders: [],
     existing_subfolders: [],
     stats: { renamed: 0, trashed: 0, moved: 0, skipped: 0 },
+    session_complete: false,
   });
 
   const progress = $derived(
@@ -84,7 +85,25 @@
   );
 
   const hasWorkspace = $derived(
-    !showWelcome && !!appState.folder_path && appState.total > 0,
+    !showWelcome &&
+      !!appState.folder_path &&
+      appState.total > 0 &&
+      !appState.session_complete,
+  );
+
+  const showSessionComplete = $derived(
+    !showWelcome &&
+      !!appState.folder_path &&
+      (appState.session_complete || appState.total === 0),
+  );
+
+  const sessionStatsLine = $derived(
+    format(locale, "sessionStats", {
+      renamed: appState.stats.renamed,
+      trashed: appState.stats.trashed,
+      moved: appState.stats.moved,
+      skipped: appState.stats.skipped,
+    }),
   );
 
   const sidebarLayout = $derived(layoutMode === "sidebar" && hasWorkspace);
@@ -312,7 +331,34 @@
     if (actionInFlight) return;
     try {
       appState = await invokeLogged<FrontendState>("skip_current", { delta });
+      if (appState.session_complete) {
+        renameValue = "";
+        return;
+      }
       renameValue = "";
+      focusRenameInput();
+    } catch (error) {
+      showToast(String(error), true, 8000);
+    }
+  }
+
+  async function restartQueue() {
+    try {
+      appState = await invokeLogged<FrontendState>("restart_queue");
+      renameValue = "";
+      if (appState.total === 0) {
+        showToast(t(locale, "emptyQueue"));
+      } else {
+        focusRenameInput();
+      }
+    } catch (error) {
+      showToast(String(error), true, 8000);
+    }
+  }
+
+  async function dismissSessionComplete() {
+    try {
+      appState = await invokeLogged<FrontendState>("dismiss_session_complete");
       focusRenameInput();
     } catch (error) {
       showToast(String(error), true, 8000);
@@ -628,7 +674,7 @@
   </header>
 
   {#if appState.armed_folder && hasWorkspace}
-    <div class="armed-banner">
+    <div class="armed-banner" title={appState.armed_folder}>
       {format(locale, "armedBanner", { folder: appState.armed_folder })}
     </div>
   {/if}
@@ -639,6 +685,30 @@
 
   {#if showWelcome}
     <WelcomeScreen {locale} bind:dontShowAgain onStart={finishWelcome} hideSupport={!!screenshotMode} />
+  {:else if showSessionComplete}
+    <div class="empty-state">
+      <div class="welcome-card session-complete-card">
+        <h2>
+          {appState.total === 0
+            ? t(locale, "emptyQueue")
+            : t(locale, "sessionReachedEnd")}
+        </h2>
+        <p class="session-stats-line">{sessionStatsLine}</p>
+        <div class="modal-actions">
+          <button class="primary-btn" onclick={() => void restartQueue()}>
+            {t(locale, "restartQueue")}
+          </button>
+          {#if appState.total > 0}
+            <button class="ghost-btn" onclick={() => void dismissSessionComplete()}>
+              {t(locale, "continueReviewing")}
+            </button>
+          {/if}
+          <button class="ghost-btn" onclick={openFolderDialog}>
+            {t(locale, "openFolder")}
+          </button>
+        </div>
+      </div>
+    </div>
   {:else if !appState.folder_path}
     <div class="empty-state">
       <div class="welcome-card">
@@ -646,12 +716,6 @@
         <div class="modal-actions">
           <button class="primary-btn" onclick={openFolderDialog}>{t(locale, "openFolder")}</button>
         </div>
-      </div>
-    </div>
-  {:else if appState.total === 0}
-    <div class="empty-state">
-      <div class="welcome-card">
-        <h2>{t(locale, "emptyQueue")}</h2>
       </div>
     </div>
   {:else}
@@ -707,7 +771,7 @@
     {activeKey}
     {vertical}
     pendingTrim={pendingVideoTrim}
-    disabled={showWelcome || !appState.folder_path || appState.total === 0 || actionInFlight}
+    disabled={showWelcome || !appState.folder_path || !hasWorkspace || actionInFlight}
     onSave={() => {
       flashKey("Enter");
       void saveCurrent();

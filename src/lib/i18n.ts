@@ -21,6 +21,11 @@ const messages = {
     livePhoto: "Live Photo",
     progress: "{current} / {total}",
     emptyQueue: "All done! Every file in this folder has been processed.",
+    sessionReachedEnd: "You've reached the last file in this folder.",
+    restartQueue: "Start over",
+    continueReviewing: "Stay on last file",
+    sessionStats:
+      "{renamed} renamed · {trashed} deleted · {moved} moved · {skipped} skipped",
     writeName: "Write a name before pressing Enter.",
     armedMoveEmpty: "Saving to folder with original filename.",
     chooseFolder: "Choose or type a folder path.",
@@ -141,6 +146,11 @@ const messages = {
     livePhoto: "Live Photo",
     progress: "{current} / {total}",
     emptyQueue: "¡Terminado! Todos los archivos de esta carpeta han sido procesados.",
+    sessionReachedEnd: "Has llegado al último archivo de esta carpeta.",
+    restartQueue: "Empezar de nuevo",
+    continueReviewing: "Quedarme en el último",
+    sessionStats:
+      "{renamed} renombrados · {trashed} eliminados · {moved} movidos · {skipped} saltados",
     writeName: "Escribe un nombre antes de pulsar Enter.",
     armedMoveEmpty: "Guardando en carpeta con el nombre original.",
     chooseFolder: "Elige o escribe una ruta de carpeta.",

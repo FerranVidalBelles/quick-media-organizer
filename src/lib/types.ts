@@ -37,6 +37,7 @@ export interface FrontendState {
   favorite_folders: string[];
   existing_subfolders: string[];
   stats: SessionStats;
+  session_complete?: boolean;
 }
 
 export interface ActionResult {

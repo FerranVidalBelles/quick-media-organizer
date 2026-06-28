@@ -32,6 +32,7 @@ pub struct AppState {
     pub app_settings: AppSettings,
     pub app_data_dir: PathBuf,
     undo_overflow_notified: bool,
+    session_complete: bool,
 }
 
 impl AppState {
@@ -52,6 +53,7 @@ impl AppState {
             app_settings,
             app_data_dir,
             undo_overflow_notified: false,
+            session_complete: false,
         }
     }
 
@@ -73,7 +75,13 @@ impl AppState {
             self.scan_recursive = session.scan_recursive;
             self.rename_mode = session.rename_mode;
             self.counter_map = session.counter_map;
-            self.recent_folders = session.recent_folders;
+            if session.stats.moved == 0 && !session.recent_folders.is_empty() {
+                // Sessions saved before recents were scoped per album could inherit
+                // another folder's list; drop them until the user saves here.
+                self.recent_folders.clear();
+            } else {
+                self.recent_folders = session.recent_folders;
+            }
             self.armed_folder = session.armed_folder;
             self.undo_stack = session.undo_stack;
             self.stats = session.stats;
@@ -89,6 +97,7 @@ impl AppState {
             self.stats = SessionStats::default();
             self.current_index = 0;
             self.armed_folder = None;
+            self.recent_folders.clear();
         }
 
         sort_items(&mut items, self.sort_mode);
@@ -102,6 +111,7 @@ impl AppState {
 
         self.folder_path = Some(folder.clone());
         self.items = items;
+        self.session_complete = false;
         self.app_settings.last_folder_path = Some(folder.to_string_lossy().to_string());
         save_app_settings(&self.app_data_dir, &self.app_settings)?;
         self.persist_session_best_effort();
@@ -129,6 +139,7 @@ impl AppState {
             favorite_folders: self.app_settings.favorite_folders.clone(),
             existing_subfolders,
             stats: self.stats.clone(),
+            session_complete: self.session_complete,
         }
     }
 
@@ -141,11 +152,36 @@ impl AppState {
             return Ok(());
         }
         let len = self.items.len() as i32;
+        if delta > 0 && self.current_index as i32 >= len - 1 {
+            self.session_complete = true;
+            self.armed_folder = None;
+            self.persist_session_best_effort();
+            return Ok(());
+        }
+
         let next = (self.current_index as i32 + delta).clamp(0, len - 1) as usize;
         if next != self.current_index && delta > 0 {
             self.stats.skipped += 1;
         }
         self.current_index = next;
+        self.session_complete = false;
+        self.armed_folder = None;
+        self.persist_session_best_effort();
+        Ok(())
+    }
+
+    pub fn dismiss_session_complete(&mut self) -> Result<(), String> {
+        self.session_complete = false;
+        self.persist_session_best_effort();
+        Ok(())
+    }
+
+    pub fn restart_queue(&mut self) -> Result<(), String> {
+        let folder = self.folder_path.clone().ok_or("No folder open")?;
+        self.items = scan_folder(&folder, self.scan_recursive)?;
+        sort_items(&mut self.items, self.sort_mode);
+        self.current_index = 0;
+        self.session_complete = false;
         self.armed_folder = None;
         self.persist_session_best_effort();
         Ok(())
@@ -539,6 +575,7 @@ impl AppState {
     fn remember_folder(&mut self, folder: &str) {
         self.recent_folders.retain(|f| f != folder);
         self.recent_folders.insert(0, folder.to_string());
+        self.recent_folders.truncate(12);
     }
 
     fn refresh_after_action(&mut self) -> Result<(), String> {
@@ -548,6 +585,7 @@ impl AppState {
             sort_items(&mut self.items, self.sort_mode);
             if self.items.is_empty() {
                 self.current_index = 0;
+                self.session_complete = true;
             } else if index >= self.items.len() {
                 self.current_index = self.items.len() - 1;
             } else {

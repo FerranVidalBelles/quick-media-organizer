@@ -177,6 +177,20 @@ pub fn skip_current(state: State<'_, SharedState>, delta: i32) -> Result<Fronten
 }
 
 #[tauri::command]
+pub fn dismiss_session_complete(state: State<'_, SharedState>) -> Result<FrontendState, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.dismiss_session_complete()?;
+    Ok(guard.to_frontend_state())
+}
+
+#[tauri::command]
+pub fn restart_queue(state: State<'_, SharedState>) -> Result<FrontendState, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.restart_queue()?;
+    Ok(guard.to_frontend_state())
+}
+
+#[tauri::command]
 pub fn undo_last(
     state: State<'_, SharedState>,
     log: State<'_, SharedErrorLog>,

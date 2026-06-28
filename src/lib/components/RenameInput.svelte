@@ -34,10 +34,13 @@
       autocomplete="off"
       spellcheck="false"
     />
-    {#if armedFolder}
-      <span class="folder-badge">{t(locale, "armedFolder")}: {armedFolder}</span>
-    {/if}
   </div>
+  {#if armedFolder}
+    <div class="folder-badge" title={armedFolder}>
+      <span class="folder-badge-label">{t(locale, "armedFolder")}:</span>
+      <span class="folder-badge-path">{armedFolder}</span>
+    </div>
+  {/if}
   {#if !compact}
     <div class="inline-hints">
       <Kbd

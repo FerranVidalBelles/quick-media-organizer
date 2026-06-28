@@ -40,6 +40,8 @@ pub fn run() {
             commands::trash_current,
             commands::move_current_to_folder,
             commands::skip_current,
+            commands::dismiss_session_complete,
+            commands::restart_queue,
             commands::undo_last,
             commands::set_armed_folder,
             commands::toggle_favorite_folder,

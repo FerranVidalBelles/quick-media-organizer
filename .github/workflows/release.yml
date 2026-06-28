@@ -43,8 +43,6 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "Quick Media Organizer ${{ github.ref_name }}"
           releaseBody: |
-            First public release of **Quick Media Organizer**.
-
             Keyboard-first desktop app to rename, sort, trim and clean up phone photo & video backups.
 
             ### macOS (Apple Silicon)
@@ -56,12 +54,6 @@ jobs:
             Download the `.msi` or setup `.exe` and run the installer.
 
             **SmartScreen:** click *More info* → *Run anyway* if needed.
-
-            ### Highlights
-            - Rename & move with keyboard shortcuts
-            - Lossless video trim (FFmpeg stream copy)
-            - Safe delete to `_deleted/` with undo
-            - Live Photo pairs stay in sync
 
             ### Requirements
             - **Video trim:** FFmpeg (`brew install ffmpeg` on macOS)
