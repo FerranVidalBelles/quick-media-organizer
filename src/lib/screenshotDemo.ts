@@ -48,10 +48,17 @@ function buildBaseWorkspaceState(item: MediaItem, index: number): FrontendState 
     sort_mode: "exif_date",
     scan_recursive: false,
     rename_mode: "free",
-    armed_folder: "trips/portugal/2024",
-    recent_folders: ["trips/portugal/2024", "gym", "paperwork"],
-    favorite_folders: ["trips/portugal/2024"],
-    existing_subfolders: ["gym", "trips", "trips/portugal", "trips/portugal/2024", "paperwork"],
+    armed_folder: "trips/portugal/algarve/beach-holidays-2024",
+    recent_folders: ["trips/portugal/algarve/beach-holidays-2024", "gym", "paperwork"],
+    favorite_folders: ["trips/portugal/algarve/beach-holidays-2024"],
+    existing_subfolders: [
+      "gym",
+      "trips",
+      "trips/portugal",
+      "trips/portugal/algarve",
+      "trips/portugal/algarve/beach-holidays-2024",
+      "paperwork",
+    ],
     stats: { renamed: 412, trashed: 89, moved: 346, skipped: 1203 },
   };
 }
