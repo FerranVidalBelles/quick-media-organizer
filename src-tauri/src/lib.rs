@@ -1,0 +1,56 @@
+mod commands;
+mod error_log;
+mod fs_util;
+mod media;
+mod models;
+mod path_util;
+mod rename;
+mod session;
+mod state;
+mod video;
+
+use error_log::{ErrorLog, SharedErrorLog};
+use state::{AppState, SharedState};
+use tauri::Manager;
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("failed to resolve app data dir");
+            let error_log = ErrorLog::new(app_data_dir.clone());
+            app.manage(SharedErrorLog::new(error_log));
+            app.manage(SharedState::new(AppState::new(app_data_dir)));
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::get_app_settings,
+            commands::complete_first_run,
+            commands::set_locale,
+            commands::set_ui_preferences,
+            commands::pick_folder,
+            commands::open_folder,
+            commands::get_state,
+            commands::rename_current,
+            commands::trash_current,
+            commands::move_current_to_folder,
+            commands::skip_current,
+            commands::undo_last,
+            commands::set_armed_folder,
+            commands::toggle_favorite_folder,
+            commands::set_options,
+            commands::check_ffmpeg,
+            commands::trim_current_video,
+            commands::report_error,
+            commands::get_error_log,
+            commands::get_error_log_path,
+            commands::clear_error_log,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
