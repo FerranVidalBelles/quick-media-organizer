@@ -200,4 +200,6 @@ pub struct SessionData {
     pub armed_folder: Option<String>,
     pub undo_stack: Vec<UndoAction>,
     pub stats: SessionStats,
+    #[serde(default)]
+    pub processed_paths: Vec<String>,
 }

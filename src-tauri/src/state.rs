@@ -11,7 +11,7 @@ use crate::rename::{
 };
 use crate::session::{load_app_settings, load_session, save_app_settings, save_session};
 use crate::video::{trim_backup_path, FfmpegTools};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -33,6 +33,7 @@ pub struct AppState {
     pub app_data_dir: PathBuf,
     undo_overflow_notified: bool,
     session_complete: bool,
+    processed_paths: HashSet<String>,
 }
 
 impl AppState {
@@ -54,6 +55,7 @@ impl AppState {
             app_data_dir,
             undo_overflow_notified: false,
             session_complete: false,
+            processed_paths: HashSet::new(),
         }
     }
 
@@ -85,6 +87,7 @@ impl AppState {
             self.armed_folder = session.armed_folder;
             self.undo_stack = session.undo_stack;
             self.stats = session.stats;
+            self.processed_paths = session.processed_paths.into_iter().collect();
             saved_paths = session.current_item_paths;
             if saved_paths.is_empty() {
                 self.current_index = session
@@ -98,6 +101,7 @@ impl AppState {
             self.current_index = 0;
             self.armed_folder = None;
             self.recent_folders.clear();
+            self.processed_paths.clear();
         }
 
         sort_items(&mut items, self.sort_mode);
@@ -183,6 +187,9 @@ impl AppState {
         self.current_index = 0;
         self.session_complete = false;
         self.armed_folder = None;
+        self.stats = SessionStats::default();
+        self.counter_map.clear();
+        self.processed_paths.clear();
         self.persist_session_best_effort();
         Ok(())
     }
@@ -203,6 +210,9 @@ impl AppState {
             .cloned()
             .ok_or("No media item selected")?;
 
+        let old_index = self.current_index;
+        self.mark_item_processed(&item);
+
         let sources: Vec<PathBuf> = item.paths.iter().map(PathBuf::from).collect();
         let extensions = extensions_for_paths(&sources);
         let dest_names = resolve_group_names(
@@ -215,6 +225,11 @@ impl AppState {
         .ok_or("Invalid name")?;
 
         let completed = execute_moves(&sources, &dest_names, &folder)?;
+        let new_paths: Vec<String> = completed
+            .iter()
+            .map(|(dest, _)| dest.to_string_lossy().to_string())
+            .collect();
+        self.mark_paths_processed(&new_paths);
         let undo_moves = completed
             .into_iter()
             .map(|(dest, source)| PathPair {
@@ -234,7 +249,7 @@ impl AppState {
             stat_kind: UndoStatKind::Renamed,
         });
         self.stats.renamed += 1;
-        self.refresh_after_action()?;
+        self.refresh_after_rename(old_index, &new_paths)?;
         Ok(self.ok(&message))
     }
 
@@ -244,6 +259,8 @@ impl AppState {
             .current_item()
             .cloned()
             .ok_or("No media item selected")?;
+
+        self.mark_item_processed(&item);
 
         let deleted_dir = folder.join("_deleted");
         std::fs::create_dir_all(&deleted_dir).map_err(|e| e.to_string())?;
@@ -286,6 +303,8 @@ impl AppState {
             .current_item()
             .cloned()
             .ok_or("No media item selected")?;
+
+        self.mark_item_processed(&item);
 
         let sources: Vec<PathBuf> = item.paths.iter().map(PathBuf::from).collect();
         let extensions = extensions_for_paths(&sources);
@@ -455,6 +474,12 @@ impl AppState {
 
         self.undo_stack.pop();
         self.revert_stat(stat_kind);
+        self.unmark_paths(&focus_paths);
+        for pair in &moves {
+            self.unmark_path(&pair.from);
+            self.unmark_path(&pair.to);
+        }
+        self.session_complete = false;
 
         if let Some(folder) = self.folder_path.clone() {
             self.items = scan_folder(&folder, self.scan_recursive)?;
@@ -486,6 +511,51 @@ impl AppState {
                     .any(|focus| item.paths.iter().any(|path| path == focus))
             })
         })
+    }
+
+    fn mark_item_processed(&mut self, item: &MediaItem) {
+        self.processed_paths.insert(item.id.clone());
+        self.mark_paths_processed(&item.paths);
+    }
+
+    fn mark_paths_processed(&mut self, paths: &[String]) {
+        for path in paths {
+            self.processed_paths.insert(path.clone());
+        }
+    }
+
+    fn unmark_path(&mut self, path: &str) {
+        self.processed_paths.remove(path);
+    }
+
+    fn unmark_paths(&mut self, paths: &[String]) {
+        for path in paths {
+            self.unmark_path(path);
+        }
+    }
+
+    fn is_item_processed(&self, item: &MediaItem) -> bool {
+        self.processed_paths.contains(&item.id)
+            || item.paths.iter().any(|path| self.processed_paths.contains(path))
+    }
+
+    fn find_next_unprocessed_after(&self, after: usize) -> Option<usize> {
+        if self.items.is_empty() {
+            return None;
+        }
+
+        let after = after.min(self.items.len().saturating_sub(1));
+        for index in (after + 1)..self.items.len() {
+            if !self.is_item_processed(&self.items[index]) {
+                return Some(index);
+            }
+        }
+        for index in 0..=after {
+            if !self.is_item_processed(&self.items[index]) {
+                return Some(index);
+            }
+        }
+        None
     }
 
     pub fn set_armed_folder(&mut self, folder: Option<String>) -> Result<(), String> {
@@ -596,6 +666,36 @@ impl AppState {
         Ok(())
     }
 
+    fn refresh_after_rename(
+        &mut self,
+        old_index: usize,
+        new_paths: &[String],
+    ) -> Result<(), String> {
+        if let Some(folder) = self.folder_path.clone() {
+            self.items = scan_folder(&folder, self.scan_recursive)?;
+            sort_items(&mut self.items, self.sort_mode);
+
+            if self.items.is_empty() {
+                self.current_index = 0;
+                self.session_complete = true;
+            } else {
+                let renamed_pos = self
+                    .find_item_index_by_paths(new_paths, &self.items)
+                    .unwrap_or_else(|| old_index.min(self.items.len().saturating_sub(1)));
+
+                if let Some(next) = self.find_next_unprocessed_after(renamed_pos) {
+                    self.current_index = next;
+                    self.session_complete = false;
+                } else {
+                    self.current_index = renamed_pos;
+                    self.session_complete = true;
+                }
+            }
+        }
+        self.persist_session_best_effort();
+        Ok(())
+    }
+
     fn push_undo(&mut self, action: UndoAction) {
         self.undo_stack.push(action);
         if self.undo_stack.len() > MAX_UNDO {
@@ -642,6 +742,7 @@ impl AppState {
             armed_folder: self.armed_folder.clone(),
             undo_stack: self.undo_stack.clone(),
             stats: self.stats.clone(),
+            processed_paths: self.processed_paths.iter().cloned().collect(),
         };
 
         save_session(folder, &session)

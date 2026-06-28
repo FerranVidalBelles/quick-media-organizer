@@ -57,5 +57,6 @@ pub fn new_session(folder: &Path, sort_mode: SortMode, scan_recursive: bool) -> 
         armed_folder: None,
         undo_stack: Vec::new(),
         stats: SessionStats::default(),
+        processed_paths: Vec::new(),
     }
 }
