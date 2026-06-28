@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: windows-latest
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust target (macOS ARM)
+        if: matrix.platform == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Quick Media Organizer ${{ github.ref_name }}"
+          releaseBody: |
+            First public release of **Quick Media Organizer**.
+
+            Keyboard-first desktop app to rename, sort, trim and clean up phone photo & video backups.
+
+            ### macOS (Apple Silicon)
+            Download the `.dmg`, open it, drag the app to Applications.
+
+            **First launch:** if macOS warns about an unidentified developer, right-click → Open → confirm once.
+
+            ### Windows
+            Download the `.msi` or setup `.exe` and run the installer.
+
+            **SmartScreen:** click *More info* → *Run anyway* if needed.
+
+            ### Highlights
+            - Rename & move with keyboard shortcuts
+            - Lossless video trim (FFmpeg stream copy)
+            - Safe delete to `_deleted/` with undo
+            - Live Photo pairs stay in sync
+
+            ### Requirements
+            - **Video trim:** FFmpeg (`brew install ffmpeg` on macOS)
+          args: ${{ matrix.args }}
