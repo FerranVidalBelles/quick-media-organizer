@@ -1,0 +1,15 @@
+---
+description: Al subir a git, publicar release con build
+alwaysApply: true
+---
+
+# Git push = release build
+
+Cuando el usuario pida subir cambios a git (commit, push, "súbelo", etc.):
+
+1. Incrementar versión en `package.json`, `src-tauri/Cargo.toml` y `src-tauri/tauri.conf.json` (patch: 0.1.x → 0.1.x+1).
+2. Commit con mensaje `Release vX.Y.Z: …` describiendo los cambios.
+3. Push a `origin/main`.
+4. Crear tag `vX.Y.Z` y push del tag para disparar `.github/workflows/release.yml` (builds macOS + Windows en GitHub Actions).
+
+No publicar solo el código sin tag/release salvo que el usuario lo pida explícitamente.
