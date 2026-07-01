@@ -40,6 +40,7 @@ export interface FrontendState {
   session_complete?: boolean;
   session_reset?: boolean;
   resume_from?: number | null;
+  subfolder_media_count?: number | null;
 }
 
 export interface ActionResult {

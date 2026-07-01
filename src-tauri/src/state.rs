@@ -36,6 +36,7 @@ pub struct AppState {
     processed_paths: HashSet<String>,
     transient_session_reset: bool,
     transient_resume_from: Option<usize>,
+    transient_subfolder_media: Option<usize>,
 }
 
 impl AppState {
@@ -60,6 +61,7 @@ impl AppState {
             processed_paths: HashSet::new(),
             transient_session_reset: false,
             transient_resume_from: None,
+            transient_subfolder_media: None,
         }
     }
 
@@ -77,7 +79,9 @@ impl AppState {
 
         self.transient_session_reset = false;
         self.transient_resume_from = None;
+        self.transient_subfolder_media = None;
 
+        let subfolder_media = count_root_subfolder_media(&folder);
         let mut saved_paths: Vec<String> = Vec::new();
         if let Some(session) = load_session(&folder) {
             self.sort_mode = session.sort_mode;
@@ -94,7 +98,7 @@ impl AppState {
             self.armed_folder = session.armed_folder;
             self.undo_stack = session.undo_stack;
             self.stats = session.stats;
-            self.processed_paths.clear();
+            self.processed_paths = session.processed_paths.into_iter().collect();
             saved_paths = session.current_item_paths;
             if saved_paths.is_empty() {
                 self.current_index = session
@@ -124,12 +128,24 @@ impl AppState {
             }
         }
 
+        self.folder_path = Some(folder.clone());
+        self.items = items;
+        if let Some(item) = self.current_item() {
+            if self.is_item_processed(item) {
+                if let Some(next) = self.find_next_unprocessed_from(0) {
+                    self.current_index = next;
+                }
+            }
+        }
+
+        if !self.scan_recursive && subfolder_media > 0 {
+            self.transient_subfolder_media = Some(subfolder_media);
+        }
+
         if self.current_index > 0 && !self.transient_session_reset {
             self.transient_resume_from = Some(self.current_index + 1);
         }
 
-        self.folder_path = Some(folder.clone());
-        self.items = items;
         self.session_complete = false;
         self.app_settings.last_folder_path = Some(folder.to_string_lossy().to_string());
         save_app_settings(&self.app_data_dir, &self.app_settings)?;
@@ -161,13 +177,18 @@ impl AppState {
             session_complete: self.session_complete,
             session_reset: false,
             resume_from: None,
+            subfolder_media_count: None,
         }
     }
 
-    pub fn take_transient_open_notices(&mut self) -> (bool, Option<usize>) {
+    pub fn take_transient_open_notices(&mut self) -> (bool, Option<usize>, Option<usize>) {
         let reset = self.transient_session_reset;
         self.transient_session_reset = false;
-        (reset, self.transient_resume_from.take())
+        (
+            reset,
+            self.transient_resume_from.take(),
+            self.transient_subfolder_media.take(),
+        )
     }
 
     pub fn current_item(&self) -> Option<&MediaItem> {
@@ -571,6 +592,52 @@ impl AppState {
         }
     }
 
+    fn is_item_processed(&self, item: &MediaItem) -> bool {
+        self.processed_paths.contains(&item.id)
+            || item.paths.iter().any(|path| self.processed_paths.contains(path))
+    }
+
+    fn find_next_unprocessed_from(&self, start: usize) -> Option<usize> {
+        if self.items.is_empty() {
+            return None;
+        }
+
+        let start = start.min(self.items.len().saturating_sub(1));
+        for index in start..self.items.len() {
+            if !self.is_item_processed(&self.items[index]) {
+                return Some(index);
+            }
+        }
+        None
+    }
+
+    fn advance_after_processing(&mut self, from_index: usize, step_forward: bool) {
+        if self.items.is_empty() {
+            self.current_index = 0;
+            self.session_complete = true;
+            return;
+        }
+
+        let start = if step_forward {
+            (from_index + 1).min(self.items.len().saturating_sub(1))
+        } else {
+            from_index.min(self.items.len().saturating_sub(1))
+        };
+
+        if let Some(next) = self.find_next_unprocessed_from(start) {
+            self.current_index = next;
+            self.session_complete = false;
+            return;
+        }
+
+        if let Some(next) = self.find_next_unprocessed_from(0) {
+            self.current_index = next;
+            self.session_complete = false;
+        } else {
+            self.session_complete = true;
+        }
+    }
+
     pub fn set_armed_folder(&mut self, folder: Option<String>) -> Result<(), String> {
         if let Some(ref rel) = folder {
             let root = self.folder_path.clone().ok_or("No folder open")?;
@@ -669,10 +736,8 @@ impl AppState {
             if self.items.is_empty() {
                 self.current_index = 0;
                 self.session_complete = true;
-            } else if index >= self.items.len() {
-                self.current_index = self.items.len() - 1;
             } else {
-                self.current_index = index;
+                self.advance_after_processing(index, false);
             }
         }
         self.persist_session_best_effort();
@@ -682,7 +747,7 @@ impl AppState {
     fn refresh_after_rename(
         &mut self,
         old_index: usize,
-        new_paths: &[String],
+        _new_paths: &[String],
     ) -> Result<(), String> {
         if let Some(folder) = self.folder_path.clone() {
             self.items = scan_folder(&folder, self.scan_recursive)?;
@@ -692,20 +757,7 @@ impl AppState {
                 self.current_index = 0;
                 self.session_complete = true;
             } else {
-                let next_index = old_index.min(self.items.len().saturating_sub(1));
-                self.current_index = next_index;
-
-                // After resorting, the renamed file may still occupy this slot.
-                if self
-                    .items
-                    .get(next_index)
-                    .is_some_and(|item| paths_match_any(&item.paths, new_paths))
-                    && next_index + 1 < self.items.len()
-                {
-                    self.current_index = next_index + 1;
-                }
-
-                self.session_complete = false;
+                self.advance_after_processing(old_index, true);
             }
         }
         self.persist_session_best_effort();
@@ -758,7 +810,7 @@ impl AppState {
             armed_folder: self.armed_folder.clone(),
             undo_stack: self.undo_stack.clone(),
             stats: self.stats.clone(),
-            processed_paths: Vec::new(),
+            processed_paths: self.processed_paths.iter().cloned().collect(),
         };
 
         save_session(folder, &session)
@@ -796,12 +848,6 @@ fn session_index_fallback(saved_paths: &[String], items: &[MediaItem]) -> Option
             .iter()
             .any(|path| item.paths.iter().any(|p| p == path))
     })
-}
-
-fn paths_match_any(item_paths: &[String], target_paths: &[String]) -> bool {
-    target_paths
-        .iter()
-        .any(|path| item_paths.iter().any(|item_path| item_path == path))
 }
 
 pub type SharedState = Mutex<AppState>;

@@ -96,6 +96,9 @@ pub struct FrontendState {
     /// 1-based queue position when reopening a folder mid-session.
     #[serde(default)]
     pub resume_from: Option<usize>,
+    /// Media files found in subfolders while scan_recursive is off.
+    #[serde(default)]
+    pub subfolder_media_count: Option<usize>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

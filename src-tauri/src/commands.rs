@@ -115,10 +115,11 @@ pub fn open_folder(
     wrap(&log, "open_folder", (|| {
         let mut guard = state.lock().map_err(|e| e.to_string())?;
         guard.open_folder(PathBuf::from(path))?;
-        let (session_reset, resume_from) = guard.take_transient_open_notices();
+        let (session_reset, resume_from, subfolder_media_count) = guard.take_transient_open_notices();
         let mut frontend = guard.to_frontend_state();
         frontend.session_reset = session_reset;
         frontend.resume_from = resume_from;
+        frontend.subfolder_media_count = subfolder_media_count;
         Ok(frontend)
     })())
 }

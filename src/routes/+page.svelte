@@ -80,13 +80,10 @@
     session_complete: false,
   });
 
-  // Remaining files + those moved/trashed this session = album size when the session started.
-  const sessionInitialTotal = $derived(
-    appState.total + appState.stats.trashed + appState.stats.moved,
-  );
-
   const displayProgress = $derived.by(() => {
-    const total = sessionInitialTotal;
+    const sessionTotal =
+      appState.total + appState.stats.trashed + appState.stats.moved;
+    const total = sessionTotal || appState.total;
     if (total === 0) {
       return { current: 0, total: 0, percent: 0 };
     }
@@ -236,6 +233,14 @@
       showToast(t(locale, "sessionPositionReset"), false, 6000);
     } else if (state.resume_from && state.total > 0) {
       showResumeBanner = true;
+    }
+
+    if (state.subfolder_media_count && state.subfolder_media_count > 0) {
+      showToast(
+        format(locale, "subfolderMediaNotice", { count: state.subfolder_media_count }),
+        false,
+        8000,
+      );
     }
   }
 

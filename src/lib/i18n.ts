@@ -35,6 +35,8 @@ const messages = {
       "Could not find the last file you were on (it may have been renamed). Starting from the beginning.",
     sessionResumeBanner: "Resuming at photo {current} of {total}.",
     sessionResumeContinue: "Continue here",
+    subfolderMediaNotice:
+      "{count} more photos/videos are in subfolders. Enable “Include subfolders” in Options (Ctrl+O) to review them.",
     common: {
       ok: "OK",
       cancel: "Cancel",
@@ -166,6 +168,8 @@ const messages = {
       "No se encontró la última foto en la que estabas (puede que se haya renombrado). Empezando desde el inicio.",
     sessionResumeBanner: "Retomando en la foto {current} de {total}.",
     sessionResumeContinue: "Continuar aquí",
+    subfolderMediaNotice:
+      "Hay {count} fotos/vídeos más en subcarpetas. Activa «Incluir subcarpetas» en Opciones (Ctrl+O) para revisarlos.",
     common: {
       ok: "OK",
       cancel: "Cancelar",

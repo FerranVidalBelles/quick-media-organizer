@@ -140,48 +140,61 @@ fn is_supported_file(path: &Path) -> bool {
         .is_some_and(is_media_extension)
 }
 
+fn group_key(path: &Path) -> String {
+    let parent = path
+        .parent()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default();
+    format!("{parent}|{stem}")
+}
+
+fn path_id(path: &Path) -> String {
+    path.to_string_lossy().to_string()
+}
+
 fn group_live_photos(files: &[PathBuf]) -> Vec<MediaItem> {
-    let mut by_stem: HashMap<String, Vec<PathBuf>> = HashMap::new();
+    let mut groups: HashMap<String, Vec<PathBuf>> = HashMap::new();
 
     for path in files {
-        let stem = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or_default()
-            .to_string();
-        by_stem.entry(stem).or_default().push(path.clone());
+        groups
+            .entry(group_key(path))
+            .or_default()
+            .push(path.clone());
     }
 
-    let mut used: HashSet<String> = HashSet::new();
+    let mut processed = HashSet::new();
     let mut items = Vec::new();
 
     for path in files {
-        let id = path.to_string_lossy().to_string();
-        if used.contains(&id) {
+        if processed.contains(&path_id(path)) {
             continue;
         }
 
-        let stem = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or_default()
-            .to_string();
+        let key = group_key(path);
+        let group = groups.get(&key).cloned().unwrap_or_else(|| vec![path.clone()]);
+        let mut pending: Vec<PathBuf> = group
+            .iter()
+            .filter(|candidate| !processed.contains(&path_id(candidate)))
+            .cloned()
+            .collect();
 
-        if let Some(group) = by_stem.get(&stem) {
-            if let Some(pair) = detect_live_photo_pair(group) {
-                for p in &pair {
-                    used.insert(p.to_string_lossy().to_string());
-                }
-                if group.len() > pair.len() {
-                    // Additional files with same stem stay as separate items.
-                }
-                items.push(build_media_item(&pair, MediaKind::LivePhoto));
-                continue;
+        if let Some(pair) = detect_live_photo_pair(&pending) {
+            for candidate in &pair {
+                processed.insert(path_id(candidate));
             }
+            items.push(build_media_item(&pair, MediaKind::LivePhoto));
+            pending.retain(|candidate| !pair.iter().any(|paired| paired == candidate));
         }
 
-        used.insert(id);
-        items.push(build_media_item(&[path.clone()], MediaKind::Single));
+        for candidate in pending {
+            if processed.insert(path_id(&candidate)) {
+                items.push(build_media_item(&[candidate], MediaKind::Single));
+            }
+        }
     }
 
     items
@@ -318,4 +331,46 @@ pub fn parse_sortable_date(value: &Option<String>) -> Option<NaiveDateTime> {
     NaiveDateTime::parse_from_str(value, "%Y:%m:%d %H:%M:%S")
         .or_else(|_| NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S"))
         .ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn groups_live_photos_within_same_folder_only() {
+        let files = vec![
+            PathBuf::from("/album/a/photo.jpg"),
+            PathBuf::from("/album/b/photo.jpg"),
+            PathBuf::from("/album/a/photo.mp4"),
+        ];
+
+        let items = group_live_photos(&files);
+
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().any(|item| item.kind == MediaKind::LivePhoto));
+        assert!(items.iter().any(|item| {
+            item.kind == MediaKind::Single && item.paths[0].ends_with("/album/b/photo.jpg")
+        }));
+    }
+
+    #[test]
+    fn emits_all_files_when_group_has_extra_stem_siblings() {
+        let files = vec![
+            PathBuf::from("/album/photo.jpg"),
+            PathBuf::from("/album/photo.mp4"),
+            PathBuf::from("/album/photo (1).jpg"),
+        ];
+
+        let items = group_live_photos(&files);
+
+        assert_eq!(items.len(), 2);
+        let primaries: Vec<_> = items
+            .iter()
+            .map(|item| item.paths[0].clone())
+            .collect();
+        assert!(primaries.iter().any(|path| path.ends_with("photo.jpg")));
+        assert!(primaries.iter().any(|path| path.ends_with("photo (1).jpg")));
+    }
 }
