@@ -38,6 +38,8 @@ export interface FrontendState {
   existing_subfolders: string[];
   stats: SessionStats;
   session_complete?: boolean;
+  session_reset?: boolean;
+  resume_from?: number | null;
 }
 
 export interface ActionResult {

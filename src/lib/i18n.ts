@@ -7,7 +7,7 @@ const messages = {
     appTitle: "Quick Media Organizer",
     welcomeTitle: "Organize thousands of photos and videos with your keyboard",
     welcomeStep1: "Pick a folder full of phone media (photos, videos, IMG_1234…)",
-    welcomeStep2: "Use Enter, Ctrl+F, Ctrl+D and Space — shortcuts stay visible at all times",
+    welcomeStep2: "Use Enter, Ctrl+F, Ctrl+D and ⌘⇧Space / Ctrl+Space — shortcuts stay visible at all times",
     welcomeStep3: "Rename in place or save into folders like gym/, trips/portugal/ or paperwork/",
     welcomeStart: "Got it, let's start",
     welcomeDontShow: "Don't show again",
@@ -31,6 +31,10 @@ const messages = {
     chooseFolder: "Choose or type a folder path.",
     startupError: "Could not start the app. Check the error log.",
     resumingFolder: "Resuming last folder…",
+    sessionPositionReset:
+      "Could not find the last file you were on (it may have been renamed). Starting from the beginning.",
+    sessionResumeBanner: "Resuming at photo {current} of {total}.",
+    sessionResumeContinue: "Continue here",
     common: {
       ok: "OK",
       cancel: "Cancel",
@@ -59,7 +63,6 @@ const messages = {
       enterTrimSave: "Enter trim + save",
       folder: "Ctrl+F folder",
       delete: "Ctrl+D delete",
-      space: "Space skip (outside field)",
     },
     folderPicker: {
       title: "Save to folder",
@@ -71,6 +74,9 @@ const messages = {
       cancel: "Cancel",
       createHint: "Use paths like trips/portugal/2024",
       discard: "Discard the folder path you typed?",
+      keyboardHint: "Type to filter · Tab to complete · Enter to confirm · ↑↓ to browse",
+      matches: "Matching folders",
+      noMatches: "No matching folders — Enter creates a new path",
     },
     metadata: {
       toggle: "Press {key} for details",
@@ -132,7 +138,7 @@ const messages = {
     appTitle: "Quick Media Organizer",
     welcomeTitle: "Organiza miles de fotos y vídeos con el teclado",
     welcomeStep1: "Elige una carpeta llena de archivos del móvil (fotos, vídeos, IMG_1234…)",
-    welcomeStep2: "Usa Enter, Ctrl+F, Ctrl+D y Space — los atajos siempre están visibles",
+    welcomeStep2: "Usa Enter, Ctrl+F, Ctrl+D y ⌘⇧Space / Ctrl+Space — los atajos siempre están visibles",
     welcomeStep3: "Renombra en la raíz o guarda en carpetas como gym/, viajes/portugal/ o documentos/",
     welcomeStart: "Entendido, empezar",
     welcomeDontShow: "No volver a mostrar",
@@ -156,6 +162,10 @@ const messages = {
     chooseFolder: "Elige o escribe una ruta de carpeta.",
     startupError: "No se pudo iniciar la app. Revisa el registro de errores.",
     resumingFolder: "Reanudando última carpeta…",
+    sessionPositionReset:
+      "No se encontró la última foto en la que estabas (puede que se haya renombrado). Empezando desde el inicio.",
+    sessionResumeBanner: "Retomando en la foto {current} de {total}.",
+    sessionResumeContinue: "Continuar aquí",
     common: {
       ok: "OK",
       cancel: "Cancelar",
@@ -184,7 +194,6 @@ const messages = {
       enterTrimSave: "Enter recortar + guardar",
       folder: "Ctrl+F carpeta",
       delete: "Ctrl+D eliminar",
-      space: "Space saltar (fuera del campo)",
     },
     folderPicker: {
       title: "Guardar en carpeta",
@@ -196,6 +205,9 @@ const messages = {
       cancel: "Cancelar",
       createHint: "Usa rutas como viajes/portugal/2024",
       discard: "¿Descartar la ruta de carpeta escrita?",
+      keyboardHint: "Escribe para filtrar · Tab completa · Enter confirma · ↑↓ navega",
+      matches: "Carpetas coincidentes",
+      noMatches: "Ninguna carpeta coincide — Enter crea una ruta nueva",
     },
     metadata: {
       toggle: "Pulsa {key} para ver detalles",

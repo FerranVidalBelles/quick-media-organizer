@@ -71,7 +71,7 @@ macOS (`.dmg`) · Windows (`.msi` / `.exe`)
 | `Ctrl+F` / `⌘F` | Elegir o crear subcarpeta |
 | `Ctrl+D` / `⌘D` | Mover a `_deleted/` *(funciona mientras escribes)* |
 | `Delete` | Mover a `_deleted/` *(fuera del campo de texto)* |
-| `Space` | Saltar *(fuera del campo de texto)* |
+| `⌘⇧Space` / `Ctrl+Space` | Saltar |
 | `←` `→` | Anterior / siguiente |
 | `Ctrl+Z` / `⌘Z` | Deshacer |
 | `Ctrl+M` / `⌘M` | Ver metadata |

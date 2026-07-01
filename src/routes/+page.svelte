@@ -24,7 +24,7 @@
     getScreenshotMode,
     type ScreenshotMode,
   } from "$lib/screenshotDemo";
-  import { modKey, modLabel } from "$lib/shortcuts";
+  import { modKey, modLabel, skipModLabel, isSkipShortcut } from "$lib/shortcuts";
   import type {
     ActionResult,
     AppSettings,
@@ -53,11 +53,11 @@
   let errorLogPath = $state("logs/app-errors.jsonl");
   let skipUiPersist = $state(true);
   let actionInFlight = $state(false);
-  let undoHint = $state("");
   let folderPickerInitialQuery = $state("");
   let videoRef = $state<HTMLVideoElement | null>(null);
   let ffmpegAvailable = $state(true);
   let pendingVideoTrim = $state(false);
+  let showResumeBanner = $state(false);
   let trimPanel = $state<{
     setStartToPlayhead: () => void;
     setEndToPlayhead: () => void;
@@ -80,9 +80,30 @@
     session_complete: false,
   });
 
-  const progress = $derived(
-    appState.total === 0 ? 0 : ((appState.current_index + 1) / appState.total) * 100,
+  // Remaining files + those moved/trashed this session = album size when the session started.
+  const sessionInitialTotal = $derived(
+    appState.total + appState.stats.trashed + appState.stats.moved,
   );
+
+  const displayProgress = $derived.by(() => {
+    const total = sessionInitialTotal;
+    if (total === 0) {
+      return { current: 0, total: 0, percent: 0 };
+    }
+
+    const actions =
+      appState.stats.renamed +
+      appState.stats.trashed +
+      appState.stats.moved +
+      appState.stats.skipped;
+    const current = Math.min(actions + 1, total);
+
+    return {
+      current,
+      total,
+      percent: Math.min(100, (current / total) * 100),
+    };
+  });
 
   const hasWorkspace = $derived(
     !showWelcome &&
@@ -166,9 +187,11 @@
       if (settings.last_folder_path) {
         showToast(t(locale, "resumingFolder"));
         try {
-          appState = await invokeLogged<FrontendState>("open_folder", {
-            path: settings.last_folder_path,
-          });
+          applyOpenFolderState(
+            await invokeLogged<FrontendState>("open_folder", {
+              path: settings.last_folder_path,
+            }),
+          );
           renameValue = "";
         } catch (error) {
           showToast(String(error), true, 8000);
@@ -206,6 +229,20 @@
     }, duration);
   }
 
+  function applyOpenFolderState(state: FrontendState) {
+    appState = state;
+    showResumeBanner = false;
+    if (state.session_reset) {
+      showToast(t(locale, "sessionPositionReset"), false, 6000);
+    } else if (state.resume_from && state.total > 0) {
+      showResumeBanner = true;
+    }
+  }
+
+  function dismissResumeBanner() {
+    showResumeBanner = false;
+  }
+
   function dismissToast() {
     toastMessage = "";
   }
@@ -229,19 +266,20 @@
 
   function applyActionResult(result: ActionResult, options: { trimmed?: boolean } = {}) {
     appState = result.state;
-    const message =
+    let message =
       result.success && options.trimmed
         ? t(locale, "trim.savedWithRename")
         : result.message;
-    showToast(message, !result.success, result.success ? 2200 : 8000);
+    let duration = result.success ? 2200 : 8000;
+
+    if (result.success && result.message.toLowerCase().includes("_deleted")) {
+      message = `${message} ${format(locale, "undoHint", { key: modLabel("Z") })}`;
+      duration = 5000;
+    }
+
+    showToast(message, !result.success, duration);
     if (result.success) {
       renameValue = "";
-      if (result.message.toLowerCase().includes("_deleted")) {
-        undoHint = format(locale, "undoHint", { key: modLabel("Z") });
-        setTimeout(() => {
-          undoHint = "";
-        }, 5000);
-      }
     }
     focusRenameInput();
     if (!result.success) {
@@ -254,7 +292,7 @@
     const folder = await invokeLogged<string | null>("pick_folder");
     if (!folder) return;
     try {
-      appState = await invokeLogged<FrontendState>("open_folder", { path: folder });
+      applyOpenFolderState(await invokeLogged<FrontendState>("open_folder", { path: folder }));
       renameValue = "";
       focusRenameInput();
       await refreshErrorLogMeta();
@@ -345,6 +383,7 @@
   async function restartQueue() {
     try {
       appState = await invokeLogged<FrontendState>("restart_queue");
+      showResumeBanner = false;
       renameValue = "";
       if (appState.total === 0) {
         showToast(t(locale, "emptyQueue"));
@@ -369,7 +408,6 @@
     await runAction(async () => {
       try {
         const result = await invokeLogged<ActionResult>("undo_last");
-        undoHint = "";
         applyActionResult(result);
       } catch (error) {
         showToast(String(error), true, 8000);
@@ -539,7 +577,11 @@
         event.preventDefault();
         closeFolderPicker();
       }
-      if (event.key === "Enter" && !isInteractiveTarget(target)) {
+      if (
+        event.key === "Enter" &&
+        !isInteractiveTarget(target) &&
+        target?.id !== "folder-picker-input"
+      ) {
         event.preventDefault();
         void confirmFolder();
       }
@@ -565,6 +607,14 @@
     const mod = modKey(event);
     if (mod && handleModShortcut(mod)) {
       event.preventDefault();
+      return;
+    }
+
+    if (isSkipShortcut(event)) {
+      event.preventDefault();
+      if (!hasWorkspace || actionInFlight) return;
+      flashKey(skipModLabel());
+      void skip(1);
       return;
     }
 
@@ -619,13 +669,6 @@
       return;
     }
 
-    if (event.key === " ") {
-      event.preventDefault();
-      flashKey(" ");
-      void skip(1);
-      return;
-    }
-
     if (event.key === "ArrowRight") {
       event.preventDefault();
       flashKey("ArrowRight");
@@ -657,14 +700,21 @@
 
     <div class="progress-wrap">
       <div class="progress-bar">
-        <div class="progress-fill" style={`width:${progress}%`}></div>
+        <div class="progress-fill" style={`width:${displayProgress.percent}%`}></div>
       </div>
       <div class="progress-label">
-        {appState.total === 0 ? "0 / 0" : `${appState.current_index + 1} / ${appState.total}`}
+        {displayProgress.total === 0
+          ? "0 / 0"
+          : `${displayProgress.current} / ${displayProgress.total}`}
       </div>
     </div>
 
     <div class="toolbar-actions">
+      {#if hasWorkspace && appState.current_index > 0}
+        <button class="ghost-btn" onclick={() => void restartQueue()}>
+          {t(locale, "restartQueue")}
+        </button>
+      {/if}
       <div class="locale-switch">
         <button class:active={locale === "en"} onclick={() => changeLocale("en")}>EN</button>
         <button class:active={locale === "es"} onclick={() => changeLocale("es")}>ES</button>
@@ -679,8 +729,23 @@
     </div>
   {/if}
 
-  {#if undoHint}
-    <div class="undo-banner">{undoHint}</div>
+  {#if showResumeBanner && hasWorkspace}
+    <div class="resume-banner">
+      <span>
+        {format(locale, "sessionResumeBanner", {
+          current: displayProgress.current,
+          total: displayProgress.total,
+        })}
+      </span>
+      <div class="resume-banner-actions">
+        <button class="primary-btn" onclick={() => void restartQueue()}>
+          {t(locale, "restartQueue")}
+        </button>
+        <button class="ghost-btn" onclick={dismissResumeBanner}>
+          {t(locale, "sessionResumeContinue")}
+        </button>
+      </div>
+    </div>
   {/if}
 
   {#if showWelcome}
@@ -766,8 +831,8 @@
 {#snippet shortcutBar(vertical: boolean)}
   <ShortcutBar
     {locale}
-    current={appState.current_index}
-    total={appState.total}
+    progressCurrent={displayProgress.current}
+    progressTotal={displayProgress.total}
     {activeKey}
     {vertical}
     pendingTrim={pendingVideoTrim}
@@ -782,7 +847,7 @@
       void trashCurrent();
     }}
     onSkip={() => {
-      flashKey(" ");
+      flashKey(skipModLabel());
       void skip(1);
     }}
     onPrev={() => {

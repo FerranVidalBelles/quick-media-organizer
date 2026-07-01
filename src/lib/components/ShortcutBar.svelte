@@ -1,12 +1,12 @@
 <script lang="ts">
   import Kbd from "./Kbd.svelte";
   import { format, t, type Locale } from "../i18n";
-  import { modLabel } from "../shortcuts";
+  import { modLabel, skipModLabel } from "../shortcuts";
 
   let {
     locale,
-    current,
-    total,
+    progressCurrent,
+    progressTotal,
     activeKey = "",
     disabled = false,
     vertical = false,
@@ -23,8 +23,8 @@
     pendingTrim = false,
   }: {
     locale: Locale;
-    current: number;
-    total: number;
+    progressCurrent: number;
+    progressTotal: number;
     activeKey?: string;
     disabled?: boolean;
     vertical?: boolean;
@@ -43,6 +43,7 @@
 
   const folderKey = modLabel("F");
   const deleteKey = modLabel("D");
+  const skipKey = skipModLabel();
   const infoKey = modLabel("M");
   const optionsKey = modLabel("O");
   const undoKey = modLabel("Z");
@@ -73,9 +74,9 @@
       onclick={onDelete}
     />
     <Kbd
-      label="Space"
+      label={skipKey}
       text={t(locale, "shortcuts.space")}
-      active={activeKey === " "}
+      active={activeKey === skipKey}
       {disabled}
       onclick={onSkip}
     />
@@ -123,8 +124,8 @@
     />
     <span class="shortcut-progress">
       {format(locale, "progress", {
-        current: total === 0 ? 0 : current + 1,
-        total,
+        current: progressTotal === 0 ? 0 : progressCurrent,
+        total: progressTotal,
       })}
     </span>
   </div>

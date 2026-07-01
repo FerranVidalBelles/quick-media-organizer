@@ -90,6 +90,12 @@ pub struct FrontendState {
     pub stats: SessionStats,
     #[serde(default)]
     pub session_complete: bool,
+    /// True when a saved session position could not be restored (e.g. file renamed elsewhere).
+    #[serde(default)]
+    pub session_reset: bool,
+    /// 1-based queue position when reopening a folder mid-session.
+    #[serde(default)]
+    pub resume_from: Option<usize>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

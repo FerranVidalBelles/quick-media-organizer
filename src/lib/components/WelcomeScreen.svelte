@@ -2,7 +2,7 @@
   import Kbd from "./Kbd.svelte";
   import SupportBlock from "./SupportBlock.svelte";
   import { t, type Locale } from "../i18n";
-  import { modLabel } from "../shortcuts";
+  import { modLabel, skipModLabel } from "../shortcuts";
 
   let {
     locale,
@@ -28,7 +28,7 @@
           <Kbd label="Enter" text={t(locale, "shortcuts.enter")} />
           <Kbd label={modLabel("F")} text={t(locale, "shortcuts.folder")} />
           <Kbd label={modLabel("D")} text={t(locale, "shortcuts.delete")} danger />
-          <Kbd label="Space" text={t(locale, "shortcuts.space")} />
+          <Kbd label={skipModLabel()} text={t(locale, "shortcuts.space")} />
         </div>
       </div>
       <div class="welcome-step">3. {t(locale, "welcomeStep3")}</div>

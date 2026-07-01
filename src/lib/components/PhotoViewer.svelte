@@ -20,31 +20,33 @@
     demoMode && previewPath
       ? previewPath
       : previewPath
-        ? `${convertFileSrc(previewPath)}?v=${item?.size_bytes ?? 0}`
+        ? `${convertFileSrc(previewPath)}?v=${encodeURIComponent(item?.id ?? previewPath)}`
         : "",
   );
 </script>
 
 <div class="preview-panel">
   {#if item}
-    {#if item.kind === "live_photo"}
-      <span class="live-badge">{t(locale, "livePhoto")}</span>
-    {/if}
-
-    <div class="preview-stage">
-      {#if item.is_video}
-        <video
-          bind:this={videoRef}
-          class="preview-media"
-          src={assetUrl}
-          controls
-          autoplay
-          muted
-          playsinline
-        ></video>
-      {:else}
-        <img class="preview-media" src={assetUrl} alt={item.file_name} />
+    {#key item.id}
+      {#if item.kind === "live_photo"}
+        <span class="live-badge">{t(locale, "livePhoto")}</span>
       {/if}
-    </div>
+
+      <div class="preview-stage">
+        {#if item.is_video}
+          <video
+            bind:this={videoRef}
+            class="preview-media"
+            src={assetUrl}
+            controls
+            autoplay
+            muted
+            playsinline
+          ></video>
+        {:else}
+          <img class="preview-media" src={assetUrl} alt={item.file_name} />
+        {/if}
+      </div>
+    {/key}
   {/if}
 </div>

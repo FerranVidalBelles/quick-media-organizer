@@ -1,7 +1,7 @@
 <script lang="ts">
   import Kbd from "./Kbd.svelte";
   import { t, type Locale } from "../i18n";
-  import { modLabel } from "../shortcuts";
+  import { modLabel, skipModLabel } from "../shortcuts";
 
   let {
     locale,
@@ -49,7 +49,7 @@
       />
       <Kbd label={modLabel("F")} text={t(locale, "hints.folder")} />
       <Kbd label={modLabel("D")} text={t(locale, "hints.delete")} danger />
-      <Kbd label="Space" text={t(locale, "hints.space")} />
+      <Kbd label={skipModLabel()} text={t(locale, "shortcuts.space")} />
     </div>
   {/if}
 </div>

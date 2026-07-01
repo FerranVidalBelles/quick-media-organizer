@@ -18,3 +18,14 @@ export function modKey(event: KeyboardEvent): string | null {
   if (!hasModifier(event)) return null;
   return event.key.toLowerCase();
 }
+
+export function skipModLabel(): string {
+  return isMacPlatform() ? "⌘⇧Space" : "Ctrl+Space";
+}
+
+export function isSkipShortcut(event: KeyboardEvent): boolean {
+  if (event.key !== " " || event.altKey) return false;
+  return isMacPlatform()
+    ? event.metaKey && event.shiftKey && !event.ctrlKey
+    : event.ctrlKey && !event.metaKey && !event.shiftKey;
+}

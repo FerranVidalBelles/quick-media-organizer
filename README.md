@@ -71,7 +71,7 @@ macOS (`.dmg`) · Windows (`.msi` / `.exe`)
 | `Ctrl+F` / `⌘F` | Choose or create a subfolder |
 | `Ctrl+D` / `⌘D` | Move to `_deleted/` *(works while typing)* |
 | `Delete` | Move to `_deleted/` *(when not typing)* |
-| `Space` | Skip *(when not typing)* |
+| `⌘⇧Space` / `Ctrl+Space` | Skip |
 | `←` `→` | Previous / next |
 | `Ctrl+Z` / `⌘Z` | Undo |
 | `Ctrl+M` / `⌘M` | Toggle metadata |
